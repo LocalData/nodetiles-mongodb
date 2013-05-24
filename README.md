@@ -9,14 +9,14 @@ Quick Start
 ```
 /* Set up the libraries */
 var nodetiles = require('nodetiles-core');
-var MongoDataSource = nodetiles.datasources.GeoJson;
+var MongoDataSource = require('nodetiles-mongodb');
 
 /* Create your map context */
 var map = new nodetiles.Map();
 
 /* Add some data from Mongo! */
 map.addData(new MongoDataSource({
-  connectionString: "postgresql://localhost/database_name",
+  connectionString: "mongoose",
   tableName: "countries",
   geomField: "wkb_geometry",
   projection: "EPSG:900913"
@@ -25,5 +25,5 @@ map.addData(new MongoDataSource({
 
 Copyright
 ---------
-Copyright (c) 2012-2013 Code for America. See LICENSE for details.
+Copyright (c) 2012-2013 LocalData. See LICENSE for details.
 
