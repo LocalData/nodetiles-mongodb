@@ -38,7 +38,7 @@
   "dependencies": {
     "mongodb": "~1.3.0",
     "mongoose": "~3.6",
-    "nodetiles-core": "~0.0.1",
+    "nodetiles-core": "https://github.com/localdata/nodetiles-core/tarball/filters",
     "lodash": "~1.2"
   },
   "devDependencies": {
