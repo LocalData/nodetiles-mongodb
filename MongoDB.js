@@ -1,5 +1,5 @@
 var MongoClient = require('mongodb').MongoClient;
-var projector = require(__dirname + "/../lib/projector");
+var projector = require("nodetiles-core").projector;
 var Response = require('./ResponseModel');
 var Form = require('./FormModel');
 var __ = require("lodash");
@@ -25,30 +25,36 @@ MongoSource.prototype = {
     // First, we need to turn the coordinates into a bounds query for Mongo
     var min = [minX, minY];
     var max = [maxX, maxY];
+    console.log(minX, minY,maxX, maxY);
 
     // project request coordinates into data coordinates
     if (mapProjection !== this._projection) {
       min = projector.project.Point(mapProjection, this._projection, min);
       max = projector.project.Point(mapProjection, this._projection, max);
-      // console.log(min,max);
+      console.log(min,max);
     }
 
     var query = this._query || {};
     var parsedBbox = [[min[0], min[1]], [max[0],  max[1]]];
     query[this._geoKey] = { '$within': { '$box': parsedBbox } };
 
-    MongoClient.connect(this._connectionString, function(err, db) {
+    // TODO: set autoreconnect
+    MongoClient.connect(this._connectionString, {
+      server: {
+        auto_reconnect: true
+      }
+    }, function(err, db) {
       if(err) {
         console.log("Mongo error:", err);
       }
 
       start = Date.now();
       var stream = db.collection(this._collectionName)
-        .find(query, this._select)
+        .find(this._query, this._select)
         .stream();
 
       var cursor = db.collection(this._collectionName)
-        .find(query, selectConditions);
+        .find(this._query, this._select);
 
       var features = [];
 
@@ -61,34 +67,37 @@ MongoSource.prototype = {
        * @return {Object}       A single response structured as geoJSON
        */
       function resultToGeoJSON(item, filter) {
-        var i;
-        var obj;
-        var newItems = [];
-
-        obj = {};
-        obj.type = 'Feature';
+        item.type = 'Feature';
 
         // Get the shape
         // Or if there isn't one, use the centroid.
         if (item.geo_info.geometry !== undefined) {
-          obj.id = item.parcel_id;
-          obj.geometry = item.geo_info.geometry;
+          item.id = item.parcel_id;
+          item.geometry = item.geo_info.geometry;
         }else {
-          obj.id = item._id;
-          obj.geometry = {
-            type: 'Point',
-            coordinates: item.geo_info.centroid
-          };
+          item.id = item._id;
+          item.geometry = {};
+          item.geometry.type = 'Point';
+          item.geometry.coordinates = item.geo_info.centroid;
         }
 
-        obj.properties = item;
+        // item.properties = item;
+        item.properties = {
+          geometry: item.geo_info.geometry,
+          name: item.geo_info.humanReadableName
+        };
+
+        // Clean up a bit
+        delete item.geo_info.centroid;
+        delete item.geo_info.geometry;
+        delete item.responses;
 
         // If there is a filer, we also want the key easily accessible.
         if(filter) {
           // TODO: Handle the undefined condition
           if(item.hasOwnProperty("responses")) {
             if(item.responses.hasOwnProperty(filter.key)) {
-              obj.properties[filter.key] = item.responses[filter.key];
+              item.properties[filter.key] = item.responses[filter.key];
             }
             // else {
             //   obj.properties[filter.key] = 'undefined';
@@ -100,10 +109,10 @@ MongoSource.prototype = {
         }
 
         // Project the object
-        if (self._projection !== mapProjection){
-          return projector.project.Feature(self._projection, mapProjection, obj);
-        }
-        return obj;
+        //if (self._projection !== mapProjection){
+        //  return projector.project.Feature(self._projection, mapProjection, item);
+        //}
+        return item;
       }
 
       function addFeature(doc) {
@@ -113,6 +122,7 @@ MongoSource.prototype = {
       // ----------------------------------------------------------
       // Get the data
       // Set to true to try streaming
+      // Streaming is both broken and not optimized
       if(false) {
         stream.on('data', addFeature);
 
@@ -129,19 +139,30 @@ MongoSource.prototype = {
         // The same thing as above, except using toArray
         // NB -- conversion to a format that the renderer wants is broken
         cursor.toArray(function(error, results) {
-          console.log("Fetched " + results.length + " responses in " + (Date.now() - start) + "ms");
+          if(results) {
+            console.log("Fetched " + results.length + " responses in " + (Date.now() - start) + "ms");
+          }
 
           start = Date.now();
-          var features = [];
           var len = results.length;
+
+          // Convert the results to geojson
           for (var i = 0; i < len; i++) {
-            features.push(resultToGeoJSON(results[i]));
+            results[i] = resultToGeoJSON(results[i]);
           }
-          console.log("Processed " + results.length + " responses in " + (Date.now() - start) + "ms");
-          callback(null, {
+
+          var fc = {
             type: 'FeatureCollection',
-            features: features
-          });
+            features: results
+          };
+
+          if (self._projection !== mapProjection) {
+            fc = projector.project.FeatureCollection(self._projection, mapProjection, fc);
+          }
+
+          console.log("Processed " + results.length + " responses in " + (Date.now() - start) + "ms");
+
+          callback(null, fc);
 
         }.bind(this));
 
