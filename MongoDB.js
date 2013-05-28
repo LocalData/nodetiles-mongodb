@@ -23,13 +23,11 @@ MongoSource.prototype = {
     // First, we need to turn the coordinates into a bounds query for Mongo
     var min = [minX, minY];
     var max = [maxX, maxY];
-    console.log(minX, minY,maxX, maxY);
 
     // project request coordinates into data coordinates
     if (mapProjection !== this._projection) {
       min = projector.project.Point(mapProjection, this._projection, min);
       max = projector.project.Point(mapProjection, this._projection, max);
-      console.log(min,max);
     }
 
     var query = this._query || {};
@@ -53,6 +51,8 @@ MongoSource.prototype = {
 
       var cursor = db.collection(this._collectionName)
         .find(this._query, this._select);
+
+      console.log("Query %j %j", this._query, this._select);
 
       var features = [];
 
@@ -137,6 +137,10 @@ MongoSource.prototype = {
         // The same thing as above, except using toArray
         // NB -- conversion to a format that the renderer wants is broken
         cursor.toArray(function(error, results) {
+          if(error) {
+            console.log("Error fetching results: ", error);
+          }
+
           if(results) {
             console.log("Fetched " + results.length + " responses in " + (Date.now() - start) + "ms");
           }
