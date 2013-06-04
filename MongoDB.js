@@ -5,7 +5,8 @@ var __ = require("lodash");
 
 var MongoSource = function(options) {
   this._projection = projector.util.cleanProjString(options.projection || 'EPSG:4326');
-  this._connectionString = options.connectionString; // required
+  // this._connectionString = options.connectionString; // required
+  this._db = options.db;
   this._collectionName = options.collectionName;     // required
   this._geoKey = options.key;                        // required - name of the geodata field
   this._query =   options.query;                     // required - a query to get started with
@@ -35,24 +36,22 @@ MongoSource.prototype = {
     query[this._geoKey] = { '$within': { '$box': parsedBbox } };
 
     // TODO: set autoreconnect
-    MongoClient.connect(this._connectionString, {
-      server: {
-        auto_reconnect: true
-      }
-    }, function(err, db) {
-      if(err) {
-        console.log("Mongo error:", err);
-      }
+    //MongoClient.connect(this._connectionString, {
+    //}, function(err, db) {
+      //if(err) {
+      //  console.log("Mongo error:", err);
+      //  return;
+      //}
 
       start = Date.now();
-      var stream = db.collection(this._collectionName)
-        .find(this._query, this._select)
-        .stream();
+      // var stream = this._db.collection(this._collectionName)
+      //   .find(this._query, this._select)
+      //   .stream();
 
-      var cursor = db.collection(this._collectionName)
+      var cursor = this._db.collection(this._collectionName)
         .find(this._query, this._select);
 
-      console.log("Query %j %j", this._query, this._select);
+      // console.log("Query %j %j", this._query, this._select);
 
       var features = [];
 
@@ -172,7 +171,7 @@ MongoSource.prototype = {
 
       // Going to skip reprojecting
       // features.push(projectFeature(mapProjection, geoJSONDoc));
-    }.bind(this));
+    //}.bind(this));
   }
 };
 
