@@ -66,21 +66,21 @@ MongoSource.prototype = {
       function resultToGeoJSON(item, filter) {
         item.type = 'Feature';
 
-        // Get the shape
-        // Or if there isn't one, use the centroid.
+        // Get the geo info
         if (item.geo_info.geometry !== undefined) {
-          item.id = item.parcel_id;
+          item.id = item.object_id;
           item.geometry = item.geo_info.geometry;
         }else {
+
+          // Or if there isn't one, use the centroid.
           item.id = item._id;
           item.geometry = {};
           item.geometry.type = 'Point';
           item.geometry.coordinates = item.geo_info.centroid;
         }
 
-        // item.properties = item;
         item.properties = {
-          geometry: item.geo_info.geometry,
+          geometry: __cloneDeep(item.geo_info.geometry),
           name: item.geo_info.humanReadableName
         };
 
@@ -89,26 +89,16 @@ MongoSource.prototype = {
         delete item.geo_info.geometry;
         delete item.responses;
 
-        // If there is a filer, we also want the key easily accessible.
+        // If there is a filter, we also want the key easily accessible.
         if(filter) {
           // TODO: Handle the undefined condition
           if(item.hasOwnProperty("responses")) {
             if(item.responses.hasOwnProperty(filter.key)) {
               item.properties[filter.key] = item.responses[filter.key];
             }
-            // else {
-            //   obj.properties[filter.key] = 'undefined';
-            // }
           }
-          // else {
-          //   obj.properties[filter.key] = 'undefined';
-          // }
         }
 
-        // Project the object
-        //if (self._projection !== mapProjection){
-        //  return projector.project.Feature(self._projection, mapProjection, item);
-        //}
         return item;
       }
 
@@ -160,6 +150,9 @@ MongoSource.prototype = {
           if (self._projection !== mapProjection) {
             fc = projector.project.FeatureCollection(self._projection, mapProjection, fc);
           }
+
+          // console.log("FC");
+          // console.log(JSON.stringify(fc, null, 4));
 
           console.log("Processed " + results.length + " responses in " + (Date.now() - start) + "ms");
 
