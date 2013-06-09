@@ -1,4 +1,5 @@
-var MongoClient = require('mongodb').MongoClient;
+'use strict';
+var mongoose = require('mongoose');
 var projector = require("nodetiles-core").projector;
 var __ = require("lodash");
 
@@ -60,8 +61,14 @@ function resultToGeoJSON(item, filter) {
 
 var MongoSource = function(options) {
   this._projection = projector.util.cleanProjString(options.projection || 'EPSG:4326');
-  // this._connectionString = options.connectionString; // required
-  this._db = options.db;
+  // Either options.db or options.connectionString is required.
+  if (options.db) {
+    this._db = options.db;
+  } else {
+    this._connectionString = options.connectionString;
+    mongoose.connect(this._connectionString);
+    this._db = mongoose.connection;
+  }
   this._collectionName = options.collectionName;     // required
   this._geoKey = options.key;                        // required - name of the geodata field
   this._query =   options.query;                     // required - a query to get started with
