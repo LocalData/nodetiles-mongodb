@@ -35,13 +35,6 @@ MongoSource.prototype = {
     var parsedBbox = [[min[0], min[1]], [max[0],  max[1]]];
     query[this._geoKey] = { '$within': { '$box': parsedBbox } };
 
-    // TODO: set autoreconnect
-    //MongoClient.connect(this._connectionString, {
-    //}, function(err, db) {
-      //if(err) {
-      //  console.log("Mongo error:", err);
-      //  return;
-      //}
 
       start = Date.now();
       // var stream = this._db.collection(this._collectionName)
@@ -79,6 +72,14 @@ MongoSource.prototype = {
           item.geometry.coordinates = item.geo_info.centroid;
         }
 
+        // Copy all the responses into properties.
+        // Used later for filters.
+        item.properties = {};
+        __.extend(item.properties, item.responses);
+
+        // Add the geometries to the properties for use in the UTF grids
+        // We need to do a deep copy here, otherwise we'll get the reprojected
+        // geometries later.
         item.properties = {
           geometry: __.cloneDeep(item.geo_info.geometry),
           name: item.geo_info.humanReadableName
@@ -90,14 +91,14 @@ MongoSource.prototype = {
         delete item.responses;
 
         // If there is a filter, we also want the key easily accessible.
-        if(filter) {
-          // TODO: Handle the undefined condition
-          if(item.hasOwnProperty("responses")) {
-            if(item.responses.hasOwnProperty(filter.key)) {
-              item.properties[filter.key] = item.responses[filter.key];
-            }
-          }
-        }
+        // if(filter) {
+        //   // TODO: Handle the undefined condition
+        //   if(item.hasOwnProperty("responses")) {
+        //     if(item.responses.hasOwnProperty(filter.key)) {
+        //       item.properties[filter.key] = item.responses[filter.key];
+        //     }
+        //   }
+        // }
 
         return item;
       }
