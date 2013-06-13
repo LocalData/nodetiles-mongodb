@@ -80,7 +80,7 @@ MongoSource.prototype = {
         }
 
         item.properties = {
-          geometry: __cloneDeep(item.geo_info.geometry),
+          geometry: __.cloneDeep(item.geo_info.geometry),
           name: item.geo_info.humanReadableName
         };
 
