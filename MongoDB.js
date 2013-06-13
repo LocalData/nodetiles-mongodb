@@ -44,7 +44,7 @@ MongoSource.prototype = {
       var cursor = this._db.collection(this._collectionName)
         .find(this._query, this._select);
 
-      // console.log("Query %j %j", this._query, this._select);
+      console.log("Query %j %j", this._query, this._select);
 
       var features = [];
 
