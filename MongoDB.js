@@ -25,28 +25,25 @@ function resultToGeoJSON(item) {
     item.geometry.coordinates = item.geo_info.centroid;
   }
 
-  // Copy all the responses into properties.
-  // Used later for filters.
+  // Fill out the properties.
+  // These are used for UTF grids
   item.properties = {};
+
+  // Copy all the responses
   __.extend(item.properties, item.responses);
 
   // Add the geometries to the properties for use in the UTF grids
   // We need to do a deep copy here, otherwise we'll get the reprojected
   // geometries later.
-  item.properties = {
-    geometry: __.cloneDeep(item.geo_info.geometry),
-    name: item.geo_info.humanReadableName
-  };
+  // TODO: if we're  generating PNGs, we don't need to copy geometries.
+  item.properties.geometry = __.cloneDeep(item.geo_info.geometry),
+  item.properties.name = item.geo_info.humanReadableName
 
   // Clean up a bit
   delete item.geo_info.centroid;
   delete item.geo_info.geometry;
   delete item.responses;
 
-  // Project the object
-  //if (self._projection !== mapProjection){
-  //  return projector.project.Feature(self._projection, mapProjection, item);
-  //}
   return item;
 }
 
