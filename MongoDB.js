@@ -36,8 +36,9 @@ function resultToGeoJSON(item) {
   // We need to do a deep copy here, otherwise we'll get the reprojected
   // geometries later.
   // TODO: if we're  generating PNGs, we don't need to copy geometries.
-  item.properties.geometry = __.cloneDeep(item.geo_info.geometry),
-  item.properties.name = item.geo_info.humanReadableName
+  item.properties.geometry = __.cloneDeep(item.geo_info.geometry);
+  item.properties.name = item.geo_info.humanReadableName;
+  item.properties.parcel_id = item.geo_info.parcel_id;
 
   // Clean up a bit
   delete item.geo_info.centroid;
