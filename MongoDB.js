@@ -25,10 +25,10 @@ function resultToGeoJSON(item, filter) {
     item.geometry.coordinates = item.geo_info.centroid;
   }
 
-  // item.properties = item;
   item.properties = {
-    geometry: item.geo_info.geometry,
-    name: item.geo_info.humanReadableName
+    geometry: __.cloneDeep(item.geo_info.geometry), // otherwise it gets projected
+    name: item.geo_info.humanReadableName,
+    id: item.id
   };
 
   // Clean up a bit
@@ -52,10 +52,6 @@ function resultToGeoJSON(item, filter) {
     // }
   }
 
-  // Project the object
-  //if (self._projection !== mapProjection){
-  //  return projector.project.Feature(self._projection, mapProjection, item);
-  //}
   return item;
 }
 
