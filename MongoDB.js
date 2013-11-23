@@ -10,47 +10,40 @@ var __ = require("lodash");
  * @param  {Object} item  A single response
  * @return {Object}       A single response structured as geoJSON
  */
-function resultToGeoJSON(item, filter) {
+function resultToGeoJSON(item) {
   item.type = 'Feature';
 
-  // Get the shape
-  // Or if there isn't one, use the centroid.
+  // Get the geo info
   if (item.geo_info.geometry !== undefined) {
-    item.id = item.parcel_id;
+    item.id = item.object_id;
     item.geometry = item.geo_info.geometry;
   }else {
+    // Or if there isn't one, use the centroid.
     item.id = item._id;
     item.geometry = {};
     item.geometry.type = 'Point';
     item.geometry.coordinates = item.geo_info.centroid;
   }
 
-  item.properties = {
-    geometry: __.cloneDeep(item.geo_info.geometry), // otherwise it gets projected
-    name: item.geo_info.humanReadableName,
-    id: item.id
-  };
+  // Fill out the properties.
+  // These are used for UTF grids
+  item.properties = {};
+
+  // Copy all the responses
+  __.extend(item.properties, item.responses);
+
+  // Add the geometries to the properties for use in the UTF grids
+  // We need to do a deep copy here, otherwise we'll get the reprojected
+  // geometries later.
+  // TODO: if we're  generating PNGs, we don't need to copy geometries.
+  item.properties.geometry = __.cloneDeep(item.geo_info.geometry);
+  item.properties.name = item.geo_info.humanReadableName;
+  item.properties.object_id = item.object_id;
 
   // Clean up a bit
   delete item.geo_info.centroid;
   delete item.geo_info.geometry;
   delete item.responses;
-
-  // If there is a filer, we also want the key easily accessible.
-  if(filter) {
-    // TODO: Handle the undefined condition
-    if(item.hasOwnProperty("responses")) {
-      if(item.responses.hasOwnProperty(filter.key)) {
-        item.properties[filter.key] = item.responses[filter.key];
-      }
-      // else {
-      //   obj.properties[filter.key] = 'undefined';
-      // }
-    }
-    // else {
-    //   obj.properties[filter.key] = 'undefined';
-    // }
-  }
 
   return item;
 }
@@ -76,6 +69,34 @@ var MongoSource = function(options) {
 
 MongoSource.prototype = {
   constructor: MongoSource,
+
+  getMostRecent: function(minX, minY, maxX, maxY, mapProjection, callback) {
+    // First, we need to turn the coordinates into a bounds query for Mongo
+    var min = [minX, minY];
+    var max = [maxX, maxY];
+
+    // project request coordinates into data coordinates
+    if (mapProjection !== this._projection) {
+      min = projector.project.Point(mapProjection, this._projection, min);
+      max = projector.project.Point(mapProjection, this._projection, max);
+    }
+
+    var query = this._query || {};
+    var parsedBbox = [[min[0], min[1]], [max[0],  max[1]]];
+    query[this._geoKey] = { '$within': { '$box': parsedBbox } };
+
+    var options = { sort: { 'created' : -1 } };
+
+    this._db.collection(this._collectionName)
+    .findOne(this._query, this._select, options, function (error, result) {
+      if (error) {
+        console.log(error);
+        callback(error);
+      }
+      callback(null, result);
+    });
+
+  },
 
   getShapes: function(minX, minY, maxX, maxY, mapProjection, callback) {
 
@@ -114,6 +135,7 @@ MongoSource.prototype = {
       });
     }
 
+
     var self = this;
     function handleCursor(cursor) {
       // The same thing as above, except using toArray
@@ -151,13 +173,6 @@ MongoSource.prototype = {
       }.bind(this));
     }
 
-    // TODO: set autoreconnect
-    //MongoClient.connect(this._connectionString, {
-    //}, function(err, db) {
-      //if(err) {
-      //  console.log("Mongo error:", err);
-      //  return;
-      //}
 
       start = Date.now();
 
@@ -173,6 +188,8 @@ MongoSource.prototype = {
           .stream();
         handleStream(stream);
       } else {
+
+        console.log("SELECTING", this._select);
         this._db.collection(this._collectionName)
         .find(this._query, this._select, function (error, cursor) {
           if (error) {
