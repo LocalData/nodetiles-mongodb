@@ -38,7 +38,7 @@ function resultToGeoJSON(item) {
   // TODO: if we're  generating PNGs, we don't need to copy geometries.
   item.properties.geometry = __.cloneDeep(item.geo_info.geometry);
   item.properties.name = item.geo_info.humanReadableName;
-  item.properties.parcel_id = item.geo_info.parcel_id;
+  item.properties.object_id = item.object_id;
 
   // Clean up a bit
   delete item.geo_info.centroid;
@@ -69,6 +69,34 @@ var MongoSource = function(options) {
 
 MongoSource.prototype = {
   constructor: MongoSource,
+
+  getMostRecent: function(minX, minY, maxX, maxY, mapProjection, callback) {
+    // First, we need to turn the coordinates into a bounds query for Mongo
+    var min = [minX, minY];
+    var max = [maxX, maxY];
+
+    // project request coordinates into data coordinates
+    if (mapProjection !== this._projection) {
+      min = projector.project.Point(mapProjection, this._projection, min);
+      max = projector.project.Point(mapProjection, this._projection, max);
+    }
+
+    var query = this._query || {};
+    var parsedBbox = [[min[0], min[1]], [max[0],  max[1]]];
+    query[this._geoKey] = { '$within': { '$box': parsedBbox } };
+
+    var options = { sort: { 'created' : -1 } };
+
+    this._db.collection(this._collectionName)
+    .findOne(this._query, this._select, options, function (error, result) {
+      if (error) {
+        console.log(error);
+        callback(error);
+      }
+      callback(null, result);
+    });
+
+  },
 
   getShapes: function(minX, minY, maxX, maxY, mapProjection, callback) {
 
@@ -106,6 +134,7 @@ MongoSource.prototype = {
         });
       });
     }
+
 
     var self = this;
     function handleCursor(cursor) {
@@ -159,6 +188,8 @@ MongoSource.prototype = {
           .stream();
         handleStream(stream);
       } else {
+
+        console.log("SELECTING", this._select);
         this._db.collection(this._collectionName)
         .find(this._query, this._select, function (error, cursor) {
           if (error) {
